@@ -2,6 +2,7 @@ import {logger} from "firebase-functions";
 import functions = require("firebase-functions/v1");
 
 import admin = require("firebase-admin");
+import {users} from "./data";
 admin.initializeApp();
 
 export const onUserWritten = functions.firestore
@@ -13,6 +14,12 @@ export const onUserWritten = functions.firestore
     logger.info(`User id: ${userId}`);
     logger.info(`User data: ${JSON.stringify(data)}`);
   });
+
+export const getUsers = functions.https.onRequest(async (req, res) => {
+  const snapshot = await admin.firestore().collection("users").get();
+  const users = snapshot.docs.map((doc) => doc.data());
+  res.status(200).send(users);
+});
 
 export const updateUsers = functions.https.onRequest(async (req, res) => {
   const userId = req.params[0];
@@ -42,3 +49,23 @@ export const validateUser = functions.https.onCall(async (data, context) => {
 
   return user.data();
 });
+
+const main = async () => {
+  const db = admin.firestore();
+
+  const collectionRef = await db.collection("users").get();
+  const size = await collectionRef.size;
+
+  if (size === 0) {
+    await Promise.all(
+      users.map(async (data) => {
+        const userRef = admin.firestore().collection("users").doc();
+        await userRef.set({
+          ...data,
+          id: userRef.id,
+        });
+      })
+    );
+  }
+};
+main();
